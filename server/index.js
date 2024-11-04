@@ -5,6 +5,7 @@ const jwt = require("jsonwebtoken");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const bcrypt = require("bcryptjs");
+const ws = require("ws");
 const User = require("./models/User");
 
 dotenv.config();
@@ -126,6 +127,28 @@ app.post("/register", async (req, res) => {
 });
 
 const port = process.env.PORT || 4000;
-app.listen(port, () => {
+const server = app.listen(port, () => {
     console.log("Server is running on port", port);
+});
+
+const wss = new ws.WebSocketServer({ server });
+
+wss.on("connection", (connection, req) => {
+    const cookies = req.headers.cookie;
+    if (cookies) {
+        const tokenCookieString = cookies
+            .split(";")
+            .find((str) => str.startsWith("token="));
+        if (tokenCookieString) {
+            const token = tokenCookieString.split("=")[1];
+            if (token) {
+                jwt.verify(token, jwtSecret, {}, (err, userData) => {
+                    if (err) return res.status(403).json("Invalid Token");
+                    const { userId, username } = userData;
+                    connection.userId = userId;
+                    connection.username = username;
+                });
+            }
+        }
+    }
 });
